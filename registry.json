@@ -1,11 +1,21 @@
-[
-  {
-    "id": "affinity-global-organizer",
-    "name": "Affinity Global Organizer",
-    "description": "Selects all layers automatically, runs deep color-coding, and clears selection.",
-    "version": "2.0.0",
-    "author": "Martin",
-    "download_url": "",
-    "category": "Organization"
-  }
-]
+# Affinity Script Registry Configuration
+
+{
+  "scripts": [
+    {
+      "id": "affinity-global-organizer",
+      "name": "Affinity Global Organizer",
+      "description": "Selects all layers automatically, runs deep color-coding, and clears selection.",
+      "version": "2.0.0",
+      "author": "Martin Ryan",
+      "contributors": [],
+      "category": "Organization",
+      "image": "",
+      "url": "https://github.com/martin-ryan/Martins-Affinity-Scripts",
+      "email": "martinrryan@gmail.com",
+      "download_url": "https://github.com/martin-ryan/Martins-Affinity-Scripts.git"
+    }
+  ]
+}
+
+
