@@ -111,5 +111,8 @@ declare function alert(message: string): void;
 declare function confirm(message: string, defaultValue?: string): string;
 declare function prompt(message: string, defaultValue?: string): string;
 
-// The magic line that tricks VS Code into accepting ambient module maps inside standard workspaces
+interface GroupNode {
+	get children(): { toArray(): any[]; };
+}
+
 export { };

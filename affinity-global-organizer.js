@@ -1,95 +1,94 @@
 /**
  * name: Affinity_Global_Organizer
- * description: Selects all layers automatically, recursively color-codes individual sub-layers, and clears parent group overrides.
- * version: 2.3.0
+ * description: Selects all layers automatically, recursively scans group folder contents using the verified children collection, and applies 4-color layer tag organization.
+ * version: 3.1.0
  * author: Martin Ryan
  */
-const { Document } = require("/document");const { DocumentCommand, CompoundCommandBuilder } = require("/commands");const { Selection } = require("/selections");const { RGBA8 } = require("/colours"); 
+
+const { Document } = require("/document");
+const { DocumentCommand, CompoundCommandBuilder } = require("/commands");
+const { Selection } = require("/selections");
+const { RGBA8 } = require("/colours"); 
+
 const doc = Document.current;
+
 if (!doc) {
   alert("No document is open.");
 } else {
-  // 1. Create a master batch builder for our initial operations
-  const builder = CompoundCommandBuilder.create();
+  // 1. Create an initial builder to trigger the Select All command
+  const initBuilder = CompoundCommandBuilder.create();
+  initBuilder.addCommand(DocumentCommand.createSelectAll(doc));
+  doc.executeCommand(initBuilder.createCommand());
 
-
-  // 2. Execute a native "Select All" command to capture all top-level layers and group containers
-  const selectAllCmd = DocumentCommand.createSelectAll(doc);
-  builder.addCommand(selectAllCmd);
-  doc.executeCommand(builder.createCommand());
-
-  // 3. Read our top-level automatic selection array
+  // 2. Read the top-level layers captured by the Select All operation
   const topNodes = doc.selection.nodes.toArray();
 
   if (topNodes.length === 0) {
     alert("The document is currently empty!");
   } else {
-    // Create a fresh builder to store all of our explicit color tag modifications
-    const colorBuilder = CompoundCommandBuilder.create();
+    // 3. Create a single master builder to batch all selections and color applications
+    const masterBuilder = CompoundCommandBuilder.create();
     var processedCount = 0;
 
-    // Reusable recursive function to deep-scan nodes individually
-    function processNode(node) {
+    // Recursive function to safely traverse the layer tree and build the command queue
+    function queueNodeOperations(node) {
       if (!node) return;
-
 
       const nodeTypeName = node.constructor ? node.constructor.name : "";
       const singleSelection = Selection.create(doc, node);
       
-      // Check if the current element is a Group folder container
+      let layerTagColor;
+      var shouldColor = true;
+      
+      // --- 4-COLOR LOGIC RULES ---
+      if (node.isArtTextNode || nodeTypeName.indexOf("Text") !== -1 || typeof node.text !== "undefined") {
+        layerTagColor = RGBA8(0, 120, 215, 255); // Blue (Text)
+        console.log("Queueing BLUE for text node: [" + nodeTypeName + "]");
+      } else if (nodeTypeName.indexOf("Group") !== -1 || nodeTypeName.indexOf("LayerGroup") !== -1) {
+        // Group folder container gets marked Yellow/Amber to organize the parent layer block
+        layerTagColor = RGBA8(245, 158, 11, 255); 
+        console.log("Queueing YELLOW for group folder: [" + nodeTypeName + "]");
+      } else if (nodeTypeName.indexOf("Raster") !== -1 || nodeTypeName.indexOf("Pixel") !== -1 || nodeTypeName.indexOf("Image") !== -1) {
+        layerTagColor = RGBA8(16, 185, 129, 255); // Green (Images)
+        console.log("Queueing GREEN for image node: [" + nodeTypeName + "]");
+      } else {
+        layerTagColor = RGBA8(255, 87, 51, 255); // Red (Shapes/Vectors)
+        console.log("Queueing RED for shape node: [" + nodeTypeName + "]");
+      }
+
+      // Append sequential operations directly to the master queue blueprint
+      masterBuilder.addCommand(DocumentCommand.createSetSelection(singleSelection));
+      masterBuilder.addCommand(DocumentCommand.createSetTagColour(singleSelection, layerTagColor));
+      processedCount++;
+
+      // SUCCESS BRIDGE: If a group folder is encountered, use the verified 'children' array wrapper to scan nested sub-layers
       if (nodeTypeName.indexOf("Group") !== -1 || nodeTypeName.indexOf("LayerGroup") !== -1) {
-        console.log("Global Scan -> [" + nodeTypeName + "] -> Leaving Group container clear to avoid child overrides.");
-        
-        // Deep scan trigger: drill down into this group's custom child node tree array
-        if (node.nodes && typeof node.nodes.toArray === "function") {
-          const childNodes = node.nodes.toArray();
+        if (node.children && typeof node.children.toArray === "function") {
+          const childNodes = node.children.toArray();
+          console.log("  > Group container has " + childNodes.length + " nested elements. Diving inside...");
           for (var j = 0; j < childNodes.length; j++) {
-            processNode(childNodes[j]); // Recursive call to target child layers explicitly
+            queueNodeOperations(childNodes[j]); // Recursive call to process nested shapes/text
           }
         }
-      } else {
-        // --- 3-COLOR LOGIC RULES FOR INDIVIDUAL CANVAS ELEMENTS ---
-        let layerTagColor;
-        
-        if (node.isArtTextNode || nodeTypeName.indexOf("Text") !== -1 || typeof node.text !== "undefined") {
-
-          layerTagColor = RGBA8(0, 120, 215, 255); // Blue (Text)
-          console.log("Global Scan -> [" + nodeTypeName + "] -> Tagging BLUE (Text)");
-          
-        } else if (nodeTypeName.indexOf("Raster") !== -1 || nodeTypeName.indexOf("Pixel") !== -1 || nodeTypeName.indexOf("Image") !== -1) {
-          layerTagColor = RGBA8(16, 185, 129, 255); // Green (Images)
-          console.log("Global Scan -> [" + nodeTypeName + "] -> Tagging GREEN (Image)");
-          
-        } else {
-          layerTagColor = RGBA8(255, 87, 51, 255); // Red (Shapes/Vectors)
-          console.log("Global Scan -> [" + nodeTypeName + "] -> Tagging RED (Shape)");
-        }
-
-        // Commit the color tag specifically to this element node
-        colorBuilder.addCommand(DocumentCommand.createSetTagColour(singleSelection, layerTagColor));
-        processedCount++;
       }
     }
 
-    // Run the recursive traversal across all elements returned by the Select All operation
-
+    // Build the master command list across all top-level elements
     for (var i = 0; i < topNodes.length; i++) {
-      processNode(topNodes[i]);
+      queueNodeOperations(topNodes[i]);
     }
 
-    // 4. Commit all explicit sub-layer colors into document history at once
+    // 4. Commit the entire sequential pipeline to the document history at once
     if (processedCount > 0) {
-      doc.executeCommand(colorBuilder.createCommand());
+      doc.executeCommand(masterBuilder.createCommand());
     }
 
-    // 5. Clean Up: Clear selection so your workspace bounding boxes stay exactly how you left them
-    const clearSelectionBuilder = CompoundCommandBuilder.create();
+    // 5. Clean Up: Reset selection context back to clean slate state
+    const clearBuilder = CompoundCommandBuilder.create();
     const emptySelection = Selection.create(doc, []);
-    clearSelectionBuilder.addCommand(DocumentCommand.createSetSelection(emptySelection));
-    doc.executeCommand(clearSelectionBuilder.createCommand());
+    clearBuilder.addCommand(DocumentCommand.createSetSelection(emptySelection));
+    doc.executeCommand(clearBuilder.createCommand());
 
-    console.log("Global formatting complete! Successfully categorized " + processedCount + " individual layers.");
+    console.log("Global deferred batch formatting complete. Processed " + processedCount + " elements.");
   }
 }
-
-
