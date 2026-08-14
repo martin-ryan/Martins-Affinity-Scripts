@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "moduleResolution": "node",
+    "checkJs": true,
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "/*": ["./affinity.d.ts"]
+    }
+  },
+  "exclude": ["node_modules"]
+}
