@@ -1,8 +1,8 @@
 /**
- * name: Affinity_True_Global_Organizer
+ * name: Affinity_Global_Organizer
  * description: Selects all layers automatically, runs deep color-coding, and clears selection.
- * version: 1.5.0
- * author: Martin
+ * version: 2.0.0
+ * author: Martin Ryan
  */
 
 const { Document } = require("/document");
